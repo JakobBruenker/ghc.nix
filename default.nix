@@ -7,8 +7,10 @@
 let
   sources = import ./nix/sources.nix {};
 in
-{ nixpkgs   ? import (sources.nixpkgs) {}
-, bootghc   ? "ghc8102"
+# { nixpkgs   ? import (sources.nixpkgs) {}
+# { nixpkgs   ? import <nixpkgs> {}
+{ nixpkgs   ? import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/d3ba49889a7.tar.gz") {}
+, bootghc   ? "ghc8104"
 , version   ? "9.1"
 , hadrianCabal ? (builtins.getEnv "PWD") + "/hadrian/hadrian.cabal"
 , nixpkgs-unstable ? import (sources.nixpkgs-unstable) {}
@@ -26,22 +28,33 @@ in
 
 with nixpkgs;
 
+
 let
     llvmForGhc = if lib.versionAtLeast version "9.1"
                  then llvm_10
                  else llvm_9;
+    noCheckHaskell = haskell // {
+      packages = haskell.packages // {
+        ghc8104 = haskell.packages.${bootghc}.override {
+          overrides = self: super: {
+            time-compat = haskell.lib.dontCheck super.time-compat;
+            vector = haskell.lib.dontCheck super.vector;
+          };
+        };
+      };
+    };
 
     stdenv =
       if useClang
       then nixpkgs.clangStdenv
       else nixpkgs.stdenv;
-    noTest = pkg: haskell.lib.dontCheck pkg;
+    noTest = pkg: noCheckHaskell.lib.dontCheck pkg;
 
-    hspkgs = haskell.packages.${bootghc}.override {
+    hspkgs = noCheckHaskell.packages.${bootghc}.override {
       all-cabal-hashes = sources.all-cabal-hashes;
     };
 
-    ghc    = haskell.compiler.${bootghc};
+    ghc    = noCheckHaskell.compiler.${bootghc};
 
     ourtexlive =
       nixpkgs.texlive.combine {
@@ -68,7 +81,7 @@ let
       ++ optional withNuma numactl
       ++ optional withDwarf elfutils
       ++ optional withGhcid ghcid
-      ++ optional withIde (nixpkgs-unstable.haskell-language-server.override { supportedGhcVersions = [ (builtins.replaceStrings ["."] [""] ghc.version) ]; })
+      ++ optional withIde (nixpkgs-unstable.noCheckHaskell-language-server.override { supportedGhcVersions = [ (builtins.replaceStrings ["."] [""] ghc.version) ]; })
       ++ optional withDtrace linuxPackages.systemtap
       ++ (if (! stdenv.isDarwin)
           then [ pxz ]
@@ -82,7 +95,7 @@ let
     happy =
       if lib.versionAtLeast version "9.1"
       then noTest (hspkgs.callHackage "happy" "1.20.0" {})
-      else noTest (haskell.packages.ghc865.callHackage "happy" "1.19.12" {});
+      else noTest (noCheckHaskell.packages.ghc865.callHackage "happy" "1.19.12" {});
 
     alex =
       if lib.versionAtLeast version "9.1"
