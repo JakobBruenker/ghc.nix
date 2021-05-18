@@ -7,10 +7,10 @@
 let
   sources = import ./nix/sources.nix {};
 in
-{ nixpkgs   ? import (sources.nixpkgs) {}
+# { nixpkgs   ? import (sources.nixpkgs) {}
 # { nixpkgs   ? import <nixpkgs> {}
-# { nixpkgs   ? import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/d3ba49889a7.tar.gz") {}
-, bootghc   ? "ghc8102"
+{ nixpkgs   ? import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/d3ba49889a7.tar.gz") {}
+, bootghc   ? "ghc8104"
 , version   ? "9.1"
 , hadrianCabal ? (builtins.getEnv "PWD") + "/hadrian/hadrian.cabal"
 , nixpkgs-unstable ? import (sources.nixpkgs-unstable) {}
@@ -35,7 +35,7 @@ let
                  else llvm_9;
     noCheckHaskell = haskell // {
       packages = haskell.packages // {
-        ghc8102 = haskell.packages.${bootghc}.override {
+        ghc8104 = haskell.packages.${bootghc}.override {
           overrides = self: super: {
             time-compat = haskell.lib.dontCheck super.time-compat;
             vector = haskell.lib.dontCheck super.vector;
@@ -81,7 +81,7 @@ let
       ++ optional withNuma numactl
       ++ optional withDwarf elfutils
       ++ optional withGhcid ghcid
-      ++ optional withIde (nixpkgs-unstable.haskell-language-server.override { supportedGhcVersions = [ (builtins.replaceStrings ["."] [""] ghc.version) ]; })
+      ++ optional withIde (nixpkgs.haskell-language-server.override { supportedGhcVersions = [ (builtins.replaceStrings ["."] [""] ghc.version) ]; })
       ++ optional withDtrace linuxPackages.systemtap
       ++ (if (! stdenv.isDarwin)
           then [ pxz ]
